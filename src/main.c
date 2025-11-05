@@ -43,14 +43,13 @@ void* ping_ip(void* arg) {
 	struct thread_data* data = (struct thread_data*) arg;
 
 	int timeout = 1;
+	pingobj_t* ping = ping_construct();
+	ping_setopt(ping, PING_OPT_TIMEOUT, &timeout);
 
 	int64_t ip_number;
 	char ip[32];
 	while (get_next_ip(&ip_number)) {
 		ip_to_str(ip_number, ip);
-
-		pingobj_t* ping = ping_construct();
-		ping_setopt(ping, PING_OPT_TIMEOUT, &timeout);
 
 		ping_host_add(ping, ip);
 		ping_send(ping);
@@ -72,7 +71,7 @@ void* ping_ip(void* arg) {
 			set_pixel_grayscale(data->png, x, y, 0);
 		}
 
-		ping_destroy(ping);
+		ping_host_remove(ping, ip);
 	}
 
 	return (NULL);
