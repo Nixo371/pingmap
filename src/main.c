@@ -9,9 +9,11 @@
 #include <pthread.h>
 #include <oping.h>
 
-#define TOTAL_IPS ((int64_t) 256 * 256 * 256 * 256)
 #define DIMENSION 65536
 #define BIT_DEPTH 1
+
+#define TOTAL_IPS ((int64_t) 256 * 256 * 256 * 256)
+#define THREAD_COUNT 256
 
 static int64_t next_ip = 0;
 pthread_mutex_t ip_lock;
@@ -42,7 +44,7 @@ struct thread_data {
 void* ping_ip(void* arg) {
 	struct thread_data* data = (struct thread_data*) arg;
 
-	int timeout = 1;
+	double timeout = 1;
 	pingobj_t* ping = ping_construct();
 	ping_setopt(ping, PING_OPT_TIMEOUT, &timeout);
 
@@ -79,32 +81,33 @@ void* ping_ip(void* arg) {
 
 void* print_status(void* arg) {
 	while(1) {
-		double percentage = (double) next_ip / (double)((int64_t) DIMENSION * DIMENSION);
-		printf("\rProgress: %lf%% (%ld/%ld)", percentage, next_ip, (int64_t)DIMENSION * DIMENSION);
-		usleep(100000); // 0.1 seconds
+		// double percentage = (double) next_ip / (double)((int64_t) DIMENSION * DIMENSION);
+		// printf("\rProgress: %lf%% (%ld/%ld)", percentage, next_ip, (int64_t)DIMENSION * DIMENSION);
+		int64_t ip = next_ip;
+		printf("%d.%d.%d.%d\r", ((int)(ip >> 24) % 256), ((int)(ip >> 16) % 256), ((int)(ip >> 8) % 256), ((int)(ip) % 256));
 	}
 
 	return (arg);
 }
 
 int main() {
-	pthread_t threads[256 + 1];
+	pthread_t threads[THREAD_COUNT + 1];
 	pthread_mutex_init(&ip_lock, NULL);
 	pixelPNG* pingmap = initialize_png(DIMENSION, DIMENSION, BIT_DEPTH, GRAYSCALE, 0, 0, 0);
 
 	struct thread_data* data = malloc(sizeof(struct thread_data));
 	data->png = pingmap;
 
-	pthread_create(&threads[256], NULL, print_status, NULL);
-	for (int i = 0; i < 256; i++) {
+	pthread_create(&threads[THREAD_COUNT], NULL, print_status, NULL);
+	for (int i = 0; i < THREAD_COUNT; i++) {
 		pthread_create(&threads[i], NULL, ping_ip, (void*)data);
 	}
 
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < THREAD_COUNT; i++) {
 		pthread_join(threads[i], NULL);
 	}
-	pthread_cancel(threads[256]);
-	pthread_join(threads[256], NULL);
+	pthread_cancel(threads[THREAD_COUNT]);
+	pthread_join(threads[THREAD_COUNT], NULL);
 
 	free(data);
 	generate_png(pingmap, "pingmap.png");
