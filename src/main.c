@@ -13,6 +13,7 @@
 #define BIT_DEPTH 1
 
 #define TOTAL_IPS ((int64_t) 256 * 256 * 256 * 256)
+#define BATCH_COUNT 16
 #define THREAD_COUNT 256
 
 static int64_t next_ip = 0;
@@ -21,8 +22,9 @@ pthread_mutex_t ip_lock;
 int get_next_ip(int64_t *ip_number) {
     int has_work = 0;
     pthread_mutex_lock(&ip_lock);
-    if (next_ip < TOTAL_IPS) {
-        *ip_number = next_ip++;
+    if (next_ip * BATCH_COUNT < TOTAL_IPS) {
+        *ip_number = next_ip * BATCH_COUNT;
+	next_ip++;
         has_work = 1;
     }
     pthread_mutex_unlock(&ip_lock);
@@ -41,6 +43,25 @@ struct thread_data {
 	pixelPNG* png;
 };
 
+int64_t get_ip_number(char address[]) {
+	int64_t ip_number = 0;
+
+	int tmp = 0;
+	for (int i = 0; address[i] != '\0'; i++) {
+		if (address[i] == '.') {
+			ip_number = (ip_number << 8) + tmp;
+			tmp = 0;
+			continue;
+		}
+
+		tmp *= 10;
+		tmp += address[i] - '0';
+	}
+	ip_number = (ip_number * 256) + tmp;
+
+	return (ip_number);
+}
+
 void* ping_ip(void* arg) {
 	struct thread_data* data = (struct thread_data*) arg;
 
@@ -51,29 +72,41 @@ void* ping_ip(void* arg) {
 	int64_t ip_number;
 	char ip[32];
 	while (get_next_ip(&ip_number)) {
-		ip_to_str(ip_number, ip);
+		for (int i = 0; i < BATCH_COUNT; i++) {
+			ip_to_str(ip_number + i, ip);
 
-		ping_host_add(ping, ip);
+			ping_host_add(ping, ip);
+		}
 		ping_send(ping);
 
-		pingobj_iter_t* iter = ping_iterator_get(ping);
+		pingobj_iter_t* iter;
+		for (iter = ping_iterator_get(ping); iter != NULL; iter = ping_iterator_next(iter)) {
+			double latency = 0.0;
+			size_t len = sizeof(latency);
+			ping_iterator_get_info(iter, PING_INFO_LATENCY, &latency, &len);
 
-		double latency = 0.0;
-		size_t len = sizeof(latency);
-		ping_iterator_get_info(iter, PING_INFO_LATENCY, &latency, &len);
+			char address[40];
+			size_t address_len = sizeof(address);
+			ping_iterator_get_info(iter, PING_INFO_ADDRESS, address, &address_len);
+			int64_t ip_address = get_ip_number(address);
 
-		// printf("Pinging %d.%d.%d.%d...\n", data->first_ip_byte, data->second_ip_byte, third, fourth);
+			// printf("%s - %ld.%ld.%ld.%ld\n", address, ((ip_address >> 24) % 256), ((ip_address >> 16) % 256), ((ip_address >> 8) % 256), ((ip_address) % 256));
 
-		int x, y;
-		d2xy(DIMENSION, ip_number, &x, &y);
-		if (latency > 0) {
-			set_pixel_grayscale(data->png, x, y, 1);
+			int x, y;
+			d2xy(DIMENSION, ip_address, &x, &y);
+			if (latency > 0) {
+				set_pixel_grayscale(data->png, x, y, 1);
+			}
+			else {
+				set_pixel_grayscale(data->png, x, y, 0);
+			}
 		}
-		else {
-			set_pixel_grayscale(data->png, x, y, 0);
-		}
 
-		ping_host_remove(ping, ip);
+		for (int i = 0; i < BATCH_COUNT; i++) {
+			ip_to_str(ip_number + i, ip);
+
+			ping_host_remove(ping, ip);
+		}
 	}
 
 	return (NULL);
@@ -83,7 +116,7 @@ void* print_status(void* arg) {
 	while(1) {
 		// double percentage = (double) next_ip / (double)((int64_t) DIMENSION * DIMENSION);
 		// printf("\rProgress: %lf%% (%ld/%ld)", percentage, next_ip, (int64_t)DIMENSION * DIMENSION);
-		int64_t ip = next_ip;
+		int64_t ip = next_ip * BATCH_COUNT;
 		printf("%d.%d.%d.%d\r", ((int)(ip >> 24) % 256), ((int)(ip >> 16) % 256), ((int)(ip >> 8) % 256), ((int)(ip) % 256));
 	}
 
