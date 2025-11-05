@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <oping.h>
 
-#define TOTAL_IPS ((int64_t) 256 * 256 * 256)
+#define TOTAL_IPS ((int64_t) 256 * 256 * 256 * 256)
 #define DIMENSION 65536
 #define BIT_DEPTH 1
 
@@ -47,37 +47,30 @@ void* ping_ip(void* arg) {
 	int64_t ip_number;
 	char ip[32];
 	while (get_next_ip(&ip_number)) {
+		ip_to_str(ip_number, ip);
+
 		pingobj_t* ping = ping_construct();
 		ping_setopt(ping, PING_OPT_TIMEOUT, &timeout);
 
-		ip_number = ip_number << 8;
-		for (int i = 0; i < 256; i++) {
-			ip_to_str(ip_number + i, ip);
-			ping_host_add(ping, ip);
-		}
-
+		ping_host_add(ping, ip);
 		ping_send(ping);
 
-		pingobj_iter_t* iter;
-		int i = 0;
-		for (iter = ping_iterator_get(ping); iter != NULL; iter = ping_iterator_next(iter)) {
-			double latency = 0.0;
-			size_t len = sizeof(latency);
-			ping_iterator_get_info(iter, PING_INFO_LATENCY, &latency, &len);
+		pingobj_iter_t* iter = ping_iterator_get(ping);
 
-			int x, y;
-			d2xy(DIMENSION, ip_number + i, &x, &y);
-			if (latency > 0) {
-				set_pixel_grayscale(data->png, x, y, 1);
-			}
-			else {
-				set_pixel_grayscale(data->png, x, y, 0);
-			}
-
-			i++;
-		}
+		double latency = 0.0;
+		size_t len = sizeof(latency);
+		ping_iterator_get_info(iter, PING_INFO_LATENCY, &latency, &len);
 
 		// printf("Pinging %d.%d.%d.%d...\n", data->first_ip_byte, data->second_ip_byte, third, fourth);
+
+		int x, y;
+		d2xy(DIMENSION, ip_number, &x, &y);
+		if (latency > 0) {
+			set_pixel_grayscale(data->png, x, y, 1);
+		}
+		else {
+			set_pixel_grayscale(data->png, x, y, 0);
+		}
 
 		ping_destroy(ping);
 	}
@@ -88,7 +81,7 @@ void* ping_ip(void* arg) {
 void* print_status(void* arg) {
 	while(1) {
 		double percentage = (double) next_ip / (double)((int64_t) DIMENSION * DIMENSION);
-		printf("\rProgress: %lf%% (%ld/%ld)", percentage, next_ip * 256, (int64_t)DIMENSION * DIMENSION);
+		printf("\rProgress: %lf%% (%ld/%ld)", percentage, next_ip, (int64_t)DIMENSION * DIMENSION);
 		usleep(100000); // 0.1 seconds
 	}
 
@@ -105,7 +98,6 @@ int main() {
 
 	pthread_create(&threads[256], NULL, print_status, NULL);
 	for (int i = 0; i < 256; i++) {
-
 		pthread_create(&threads[i], NULL, ping_ip, (void*)data);
 	}
 
