@@ -12,7 +12,7 @@ NAME = pingmap
 all: $(NAME)
 
 $(NAME): $(OBJS)
-	$(CC) $^ -Llib -lpixelpng -lz -o $(NAME)
+	$(CC) $^ -Llib -lpixelpng -lz -loping -o $(NAME)
 
 %.o: %.c
 	$(CC) $(FLAGS) -c -o $@ $<
