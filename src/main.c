@@ -44,7 +44,7 @@ struct thread_data {
 void* ping_ip(void* arg) {
 	struct thread_data* data = (struct thread_data*) arg;
 
-	double timeout = 1;
+	double timeout = 1.0;
 	pingobj_t* ping = ping_construct();
 	ping_setopt(ping, PING_OPT_TIMEOUT, &timeout);
 
