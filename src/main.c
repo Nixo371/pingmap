@@ -14,7 +14,7 @@
 
 #define TOTAL_IPS ((int64_t) 256 * 256 * 256 * 256)
 #define BATCH_COUNT 16
-#define THREAD_COUNT 256
+#define THREAD_COUNT 1024
 
 static int64_t next_ip = 0;
 pthread_mutex_t ip_lock;
@@ -113,7 +113,7 @@ void* ping_ip(void* arg) {
 }
 
 void* print_status(void* arg) {
-	while(1) {
+	while(next_ip * BATCH_COUNT < TOTAL_IPS) {
 		// double percentage = (double) next_ip / (double)((int64_t) DIMENSION * DIMENSION);
 		// printf("\rProgress: %lf%% (%ld/%ld)", percentage, next_ip, (int64_t)DIMENSION * DIMENSION);
 		int64_t ip = next_ip * BATCH_COUNT;
@@ -139,7 +139,6 @@ int main() {
 	for (int i = 0; i < THREAD_COUNT; i++) {
 		pthread_join(threads[i], NULL);
 	}
-	pthread_cancel(threads[THREAD_COUNT]);
 	pthread_join(threads[THREAD_COUNT], NULL);
 
 	free(data);
