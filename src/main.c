@@ -109,6 +109,7 @@ void* ping_ip(void* arg) {
 		}
 	}
 
+	ping_destroy(ping);
 	return (NULL);
 }
 
@@ -143,4 +144,6 @@ int main() {
 
 	free(data);
 	generate_png(pingmap, "pingmap.png");
+
+	free_png(pingmap);
 }

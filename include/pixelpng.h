@@ -58,6 +58,7 @@ typedef struct {
 // PNG
 pixelPNG* initialize_png(int width, int height, unsigned char bit_depth, int color_type, unsigned char compression_method, unsigned char filter_method, unsigned char interlace_method);
 void generate_png(pixelPNG* pixelPNG, char* file_name);
+void free_png(pixelPNG* pixelPNG);
 
 // Pixels
 pixel get_pixel(pixelPNG* pixelPNG, int x, int y);
