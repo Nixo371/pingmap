@@ -18,6 +18,7 @@
 
 static int64_t next_ip = 0;
 pthread_mutex_t ip_lock;
+pthread_mutex_t png_lock;
 
 int get_next_ip(int64_t *ip_number) {
     int has_work = 0;
@@ -95,10 +96,14 @@ void* ping_ip(void* arg) {
 			int x, y;
 			d2xy(DIMENSION, ip_address, &x, &y);
 			if (latency > 0) {
+				pthread_mutex_lock(&png_lock);
 				set_pixel_grayscale(data->png, x, y, 1);
+				pthread_mutex_unlock(&png_lock);
 			}
 			else {
+				pthread_mutex_lock(&png_lock);
 				set_pixel_grayscale(data->png, x, y, 0);
+				pthread_mutex_unlock(&png_lock);
 			}
 		}
 
@@ -127,6 +132,7 @@ void* print_status(void* arg) {
 int main() {
 	pthread_t threads[THREAD_COUNT + 1];
 	pthread_mutex_init(&ip_lock, NULL);
+	pthread_mutex_init(&png_lock, NULL);
 	pixelPNG* pingmap = initialize_png(DIMENSION, DIMENSION, BIT_DEPTH, GRAYSCALE, 0, 0, 0);
 
 	struct thread_data* data = malloc(sizeof(struct thread_data));
